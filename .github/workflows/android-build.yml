@@ -1,0 +1,64 @@
+name: Android Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile Wear OS app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;36.0.0" "platform-tools"
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.3.1
+
+      - name: Build minified debug APK
+        run: gradle :app:assembleMinifiedDebug --stacktrace
+
+      - name: Verify APK size is under 20 MB
+        run: |
+          APK="app/build/outputs/apk/minifiedDebug/app-minifiedDebug.apk"
+          MAX_BYTES=$((20 * 1024 * 1024))
+          ACTUAL_BYTES=$(stat -c%s "$APK")
+          echo "APK size: $ACTUAL_BYTES bytes"
+          if [ "$ACTUAL_BYTES" -ge "$MAX_BYTES" ]; then
+            echo "APK is too large; expected less than 20 MB."
+            exit 1
+          fi
+
+      - name: Upload minified debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: EchoStream-minified-debug-apk
+          path: app/build/outputs/apk/minifiedDebug/app-minifiedDebug.apk
+          if-no-files-found: error
+          retention-days: 14
