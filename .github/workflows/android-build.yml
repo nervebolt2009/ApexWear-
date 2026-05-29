@@ -41,6 +41,27 @@ jobs:
         with:
           gradle-version: 9.3.1
 
+      - name: Build minified debug APK
+        run: gradle :app:assembleMinifiedDebug --stacktrace
+
+      - name: Verify APK size is under 20 MB
+        run: |
+          APK="app/build/outputs/apk/minifiedDebug/app-minifiedDebug.apk"
+          MAX_BYTES=$((20 * 1024 * 1024))
+          ACTUAL_BYTES=$(stat -c%s "$APK")
+          echo "APK size: $ACTUAL_BYTES bytes"
+          if [ "$ACTUAL_BYTES" -ge "$MAX_BYTES" ]; then
+            echo "APK is too large; expected less than 20 MB."
+            exit 1
+          fi
+
+      - name: Upload minified debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: EchoStream-minified-debug-apk
+          path: app/build/outputs/apk/minifiedDebug/app-minifiedDebug.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
 
@@ -51,4 +72,3 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-=======
