@@ -127,8 +127,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 _mediaController.value?.let { controller ->
                     controller.setMediaItem(MediaItem.fromUri(url))
                     controller.prepare()
-                    controller.playWhenReady = true
-                    _isPlaying.value = true
+                    controller.play()
+                    _isPlaying.value = controller.isPlaying
                 } ?: run {
                     _errorMessage.value = "Player is not ready yet. Try again."
                     _isBuffering.value = false
