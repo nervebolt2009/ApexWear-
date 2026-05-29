@@ -3,6 +3,7 @@ package com.echostream
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import com.echostream.ui.theme.EchoStreamTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installSplashScreen()
         setContent {
             EchoStreamTheme {
                 Box(
