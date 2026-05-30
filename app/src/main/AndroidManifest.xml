@@ -9,7 +9,9 @@
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
         android:label="EchoStream"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.EchoStream">
         <uses-library
             android:name="com.google.android.wearable"
