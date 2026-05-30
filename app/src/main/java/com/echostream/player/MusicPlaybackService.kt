@@ -7,6 +7,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -46,16 +47,43 @@ class MusicPlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
+        // Add listener to manage wake lock based on playback state
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_READY, Player.STATE_BUFFERING -> {
+                        if (player.playWhenReady) {
+                            wakeLock?.let { lock ->
+                                if (!lock.isHeld) {
+                                    lock.acquire()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                wakeLock?.let { lock ->
+                    if (isPlaying && !lock.isHeld) {
+                        lock.acquire()
+                    } else if (!isPlaying && lock.isHeld) {
+                        lock.release()
+                    }
+                }
+            }
+        })
+
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(EchoStreamSessionCallback())
             .build()
 
-        // WakeLock to keep CPU running during playback
+        // WakeLock to keep CPU running during playback - initialize but don't acquire
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "EchoStream::PlaybackWakeLock"
-        ).apply { acquire() }
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
