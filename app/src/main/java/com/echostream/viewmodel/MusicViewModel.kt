@@ -2,7 +2,7 @@ package com.echostream.viewmodel
 
 import android.app.Application
 import android.content.ComponentName
-import androidx.core.content.ContextCompat
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -16,6 +16,7 @@ import com.echostream.data.model.SearchResult
 import com.echostream.data.model.Track
 import com.echostream.network.InvidiousClient
 import com.echostream.player.MusicPlaybackService
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,12 +27,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
-    private val trackDao: TrackDao = AppDatabase.getDatabase(application).trackDao()
+    private val trackDao: TrackDao by lazy { AppDatabase.getDatabase(getApplication()).trackDao() }
     private val invidiousClient = InvidiousClient()
-    private val controllerFuture = MediaController.Builder(
-        application,
-        SessionToken(application, ComponentName(application, MusicPlaybackService::class.java))
-    ).buildAsync()
 
     private val _mediaController = MutableStateFlow<MediaController?>(null)
 
@@ -65,31 +62,84 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isTrackSaved = MutableStateFlow(false)
     val isTrackSaved: StateFlow<Boolean> = _isTrackSaved
 
+    private var controllerFuture: ListenableFuture<MediaController>? = null
     private var progressJob: Job? = null
 
     init {
-        controllerFuture.addListener(
-            {
-                _mediaController.value = controllerFuture.get()
-                startPlaybackProgressTracker()
-            },
-            ContextCompat.getMainExecutor(application)
-        )
-
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                invidiousClient.initialize()
-            }
-        }
-
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                trackDao.getAllTracks().collect { tracks ->
-                    _savedTracks.value = tracks
-                    updateCurrentTrackSavedState()
+        try {
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    try {
+                        invidiousClient.initialize()
+                    } catch (e: Exception) {
+                        Log.e("MusicViewModel", "Invidious init failed: ${e.message}", e)
+                    }
                 }
             }
+
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    try {
+                        trackDao.getAllTracks().collect { tracks ->
+                            _savedTracks.value = tracks
+                            updateCurrentTrackSavedState()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MusicViewModel", "Saved tracks load failed: ${e.message}", e)
+                    }
+                }
+            }
+
+            connectMediaController()
+        } catch (e: Exception) {
+            Log.e("MusicViewModel", "ViewModel init crashed: ${e.message}", e)
+            _errorMessage.value = "Startup error. Please restart the app."
         }
+    }
+
+    private fun connectMediaController() {
+        viewModelScope.launch(Dispatchers.Main) {
+            try {
+                val token = SessionToken(
+                    getApplication(),
+                    ComponentName(getApplication(), MusicPlaybackService::class.java)
+                )
+                val future = MediaController.Builder(getApplication<Application>(), token).buildAsync()
+                controllerFuture = future
+                future.addListener(
+                    {
+                        try {
+                            val controller = future.get()
+                            _mediaController.value = controller
+                            setupPlayerListener(controller)
+                            startPlaybackProgressTracker()
+                        } catch (e: Exception) {
+                            Log.e("MusicViewModel", "MediaController failed: ${e.message}", e)
+                            _errorMessage.value = "Player connection failed. Restart the app."
+                        }
+                    },
+                    getApplication<Application>().mainExecutor
+                )
+            } catch (e: Exception) {
+                Log.e("MusicViewModel", "MediaController failed: ${e.message}", e)
+                _errorMessage.value = "Player connection failed. Restart the app."
+            }
+        }
+    }
+
+    private fun setupPlayerListener(controller: MediaController) {
+        controller.addListener(
+            object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    _isBuffering.value = playbackState == Player.STATE_BUFFERING
+                    _duration.value = controller.duration.coerceAtLeast(0L)
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    _isPlaying.value = isPlaying
+                }
+            }
+        )
     }
 
     fun performSearch(query: String) {
@@ -130,7 +180,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     controller.play()
                     _isPlaying.value = controller.isPlaying
                 } ?: run {
-                    _errorMessage.value = "Player is not ready yet. Try again."
+                    _errorMessage.value = "Player connection failed. Restart the app."
                     _isBuffering.value = false
                 }
             } catch (error: Exception) {
@@ -166,6 +216,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     controller.play()
                 }
                 _isPlaying.value = controller.isPlaying
+            } ?: run {
+                _errorMessage.value = "Player connection failed. Restart the app."
             }
         }
     }
@@ -225,8 +277,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         progressJob?.cancel()
-        _mediaController.value?.release()
-        MediaController.releaseFuture(controllerFuture)
+        controllerFuture?.let { future ->
+            MediaController.releaseFuture(future)
+        } ?: _mediaController.value?.release()
         super.onCleared()
     }
 }
