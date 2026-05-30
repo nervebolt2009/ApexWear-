@@ -3,11 +3,16 @@ package com.echostream.player
 import android.content.Intent
 import android.os.PowerManager
 import android.os.PowerManager.WakeLock
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 
 class MusicPlaybackService : MediaSessionService() {
 
@@ -29,7 +34,9 @@ class MusicPlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession.Builder(this, player)
+            .setCallback(EchoStreamSessionCallback())
+            .build()
 
         // WakeLock to keep CPU running during playback
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
@@ -52,7 +59,36 @@ class MusicPlaybackService : MediaSessionService() {
         player.stop()
         player.release()
         mediaSession.release()
-        wakeLock?.release()
+        wakeLock?.let { lock ->
+            if (lock.isHeld) {
+                lock.release()
+            }
+        }
         super.onDestroy()
+    }
+
+    private inner class EchoStreamSessionCallback : MediaSession.Callback {
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: List<MediaItem>
+        ): ListenableFuture<List<MediaItem>> = Futures.immediateFuture(mediaItems)
+
+        @OptIn(UnstableApi::class)
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            val currentItem = player.currentMediaItem
+                ?: return Futures.immediateFailedFuture(IllegalStateException("No track available to resume"))
+
+            return Futures.immediateFuture(
+                MediaSession.MediaItemsWithStartPosition(
+                    listOf(currentItem),
+                    0,
+                    player.currentPosition.coerceAtLeast(0L)
+                )
+            )
+        }
     }
 }
