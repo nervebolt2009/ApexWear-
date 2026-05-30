@@ -127,6 +127,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+
     private fun setupPlayerListener(controller: MediaController) {
         controller.addListener(
             object : Player.Listener {
@@ -144,12 +145,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun performSearch(query: String) {
         _isSearchLoading.value = true
+        _errorMessage.value = null
         viewModelScope.launch {
             try {
                 val results = withContext(Dispatchers.IO) {
                     invidiousClient.searchVideos(query)
                 }
                 _searchResults.value = results
+                if (results.isEmpty()) {
+                    _errorMessage.value = "No results found. Check the watch internet connection and try again."
+                }
             } catch (error: Exception) {
                 _errorMessage.value = error.message ?: "Search failed. Try again."
             } finally {
