@@ -277,10 +277,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         progressJob?.cancel()
-        _mediaController.value?.release()
         controllerFuture?.let { future ->
             MediaController.releaseFuture(future)
-        }
+        } ?: _mediaController.value?.release()
         super.onCleared()
     }
 }
