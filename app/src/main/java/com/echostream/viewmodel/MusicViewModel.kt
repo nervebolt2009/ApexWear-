@@ -127,6 +127,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+
     private fun setupPlayerListener(controller: MediaController) {
         controller.addListener(
             object : Player.Listener {
@@ -281,10 +282,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         progressJob?.cancel()
-        _mediaController.value?.release()
         controllerFuture?.let { future ->
             MediaController.releaseFuture(future)
-        }
+        } ?: _mediaController.value?.release()
         super.onCleared()
     }
 }
