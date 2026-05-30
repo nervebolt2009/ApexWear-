@@ -222,11 +222,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             } ?: run {
                 _errorMessage.value = "Player connection failed. Restart the app."
             }
-
+        }
     }
 
     fun seekTo(positionMs: Long) {
-        viewModelScope.launch(Dispatchers.Main) {
+
             _mediaController.value?.seekTo(positionMs)
         }
     }
