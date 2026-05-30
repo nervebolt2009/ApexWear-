@@ -226,7 +226,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun seekTo(positionMs: Long) {
-
+        viewModelScope.launch(Dispatchers.Main) {
             _mediaController.value?.seekTo(positionMs)
         }
     }
