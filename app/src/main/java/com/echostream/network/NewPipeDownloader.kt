@@ -19,11 +19,7 @@ class NewPipeDownloader(private val client: OkHttpClient) : Downloader() {
         val builder = okhttp3.Request.Builder().url(request.url())
 
         request.headers().forEach { (name, values) ->
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
-            values.forEach { value -> builder.header(name, value) }
-
             values.forEach { value -> builder.addHeader(name, value) }
- main
         }
 
         when (request.httpMethod()) {
@@ -45,8 +41,4 @@ class NewPipeDownloader(private val client: OkHttpClient) : Downloader() {
             )
         }
     }
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 }
-
-}
- main

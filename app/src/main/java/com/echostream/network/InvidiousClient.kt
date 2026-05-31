@@ -57,16 +57,12 @@ class InvidiousClient {
 
     private fun ensureNewPipeInitialized() {
         if (newPipeReady.compareAndSet(false, true)) {
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
-            NewPipe.init(NewPipeDownloader(client))
-
             try {
                 NewPipe.init(NewPipeDownloader(client))
             } catch (error: Exception) {
                 Log.e(TAG, "NewPipe initialization failed", error)
                 newPipeReady.set(false)
             }
- main
         }
     }
 
