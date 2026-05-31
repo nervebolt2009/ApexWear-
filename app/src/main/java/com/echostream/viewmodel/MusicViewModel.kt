@@ -191,11 +191,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                 val controller = getControllerForPlayback()
                 if (controller == null) {
-                _mediaController.value?.let { controller ->
-                    controller.setMediaItem(MediaItem.fromUri(url))
-                    controller.prepare()
-                    controller.play()
-                } ?: run {
                     _errorMessage.value = "Player connection failed. Restart the app."
                     _isBuffering.value = false
                     return@launch
