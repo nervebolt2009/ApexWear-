@@ -131,6 +131,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
+    /**
+     * Attaches a Player.Listener to the given MediaController that keeps the view-model's playback state (buffering, playing, duration, and error message) in sync with player events.
+     *
+     * @param controller The MediaController to attach the listener to.
+     */
     private fun setupPlayerListener(controller: MediaController) {
         controller.addListener(
             object : Player.Listener {
@@ -173,6 +178,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Starts playback of the given search result's audio stream.
+     *
+     * Sets the current track and buffering state, attempts to obtain the audio stream URL and a media controller,
+     * and begins playback. Updates the playing and buffering state and sets a user-facing error message if the stream
+     * or player controller cannot be obtained or if playback fails.
+     *
+     * @param result The search result whose audio should be played.
+     */
     fun playTrack(result: SearchResult) {
         _isBuffering.value = true
         _currentTrack.value = result.toTrack()
@@ -207,6 +221,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Ensures a MediaController is available for playback by returning the existing controller or waiting up to 5 seconds for the async controller build; when obtained, stores it and initializes the player listener and playback progress tracker.
+     *
+     * @return The prepared `MediaController` if available, `null` otherwise.
+     */
     private suspend fun getControllerForPlayback(): MediaController? {
         _mediaController.value?.let { return it }
         return try {
@@ -225,7 +244,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun SearchResult.toMediaItem(streamUrl: String): MediaItem = MediaItem.Builder()
+    /**
+         * Builds a MediaItem for this SearchResult using the provided audio stream URL.
+         *
+         * @param streamUrl The audio stream URI to use for playback.
+         * @return A configured MediaItem whose URI is `streamUrl`, whose mediaId is this result's `videoId`, and whose metadata contains the result's `title` and `channelName` as artist.
+         */
+        private fun SearchResult.toMediaItem(streamUrl: String): MediaItem = MediaItem.Builder()
         .setUri(streamUrl)
         .setMediaId(videoId)
         .setMediaMetadata(
@@ -236,6 +261,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         )
         .build()
 
+    /**
+     * Starts a periodic tracker that polls the current MediaController and updates playback state flows.
+     *
+     * Every 500 milliseconds, if a controller is available the tracker updates:
+     * - current playback position,
+     * - duration (clamped to at least 0),
+     * - whether playback is active,
+     * - whether the player is buffering.
+     *
+     * Cancels any existing tracker before starting a new one.
+     */
     private fun startPlaybackProgressTracker() {
         progressJob?.cancel()
         progressJob = viewModelScope.launch(Dispatchers.Main) {
