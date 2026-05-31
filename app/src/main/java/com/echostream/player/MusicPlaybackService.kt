@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
+@OptIn(UnstableApi::class)
 class MusicPlaybackService : MediaSessionService() {
 
     private lateinit var player: ExoPlayer
@@ -33,7 +34,17 @@ class MusicPlaybackService : MediaSessionService() {
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
+        val httpClient = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+        val dataSourceFactory = OkHttpDataSource.Factory(httpClient)
+            .setDefaultRequestProperties(defaultPlaybackHeaders())
 
+        player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
         val okHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -107,6 +118,12 @@ class MusicPlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
+    private fun defaultPlaybackHeaders(): Map<String, String> = mapOf(
+        "User-Agent" to USER_AGENT,
+        "Accept" to "audio/webm,audio/mp4,video/webm,video/mp4,application/x-mpegurl,*/*",
+        "Accept-Language" to "en-US,en;q=0.9"
+    )
+
     private inner class EchoStreamSessionCallback : MediaSession.Callback {
         override fun onAddMediaItems(
             mediaSession: MediaSession,
@@ -130,5 +147,9 @@ class MusicPlaybackService : MediaSessionService() {
                 )
             )
         }
+    }
+
+    private companion object {
+        const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Wear OS) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 EchoStream/1.0"
     }
 }
