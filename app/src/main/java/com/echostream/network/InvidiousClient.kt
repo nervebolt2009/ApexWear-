@@ -557,10 +557,11 @@ class InvidiousClient {
 
 
 
+    /**
      * Selects the most suitable stream URL from a Piped JSON response.
      *
      * First attempts to choose the best audio stream from `audioStreams`, then a playable
-     * video stream from `videoStreams`, and finally falls back to the `hls` field.
+
      *
      * @return The selected stream URL, or `null` if no usable URL is present.
      */
