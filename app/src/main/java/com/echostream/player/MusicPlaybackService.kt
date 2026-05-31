@@ -7,13 +7,19 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
+@OptIn(UnstableApi::class)
 class MusicPlaybackService : MediaSessionService() {
 
     private lateinit var player: ExoPlayer
@@ -29,21 +35,58 @@ class MusicPlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+        val httpClient = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+        val dataSourceFactory = OkHttpDataSource.Factory(httpClient)
+            .setDefaultRequestProperties(defaultPlaybackHeaders())
+
         player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        // Add listener to manage wake lock based on playback state
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_READY, Player.STATE_BUFFERING -> {
+                        if (player.playWhenReady) {
+                            wakeLock?.let { lock ->
+                                if (!lock.isHeld) {
+                                    lock.acquire()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                wakeLock?.let { lock ->
+                    if (isPlaying && !lock.isHeld) {
+                        lock.acquire()
+                    } else if (!isPlaying && lock.isHeld) {
+                        lock.release()
+                    }
+                }
+            }
+        })
 
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(EchoStreamSessionCallback())
             .build()
 
-        // WakeLock to keep CPU running during playback
+        // WakeLock to keep CPU running during playback - initialize but don't acquire
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "EchoStream::PlaybackWakeLock"
-        ).apply { acquire(10 * 60 * 1000L) } // max 10 minutes
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
@@ -66,6 +109,12 @@ class MusicPlaybackService : MediaSessionService() {
         }
         super.onDestroy()
     }
+
+    private fun defaultPlaybackHeaders(): Map<String, String> = mapOf(
+        "User-Agent" to USER_AGENT,
+        "Accept" to "audio/webm,audio/mp4,video/webm,video/mp4,application/x-mpegurl,*/*",
+        "Accept-Language" to "en-US,en;q=0.9"
+    )
 
     private inner class EchoStreamSessionCallback : MediaSession.Callback {
         override fun onAddMediaItems(
@@ -90,5 +139,9 @@ class MusicPlaybackService : MediaSessionService() {
                 )
             )
         }
+    }
+
+    private companion object {
+        const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Wear OS) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 EchoStream/1.0"
     }
 }

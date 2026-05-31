@@ -6,6 +6,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val trackDao: TrackDao by lazy { AppDatabase.getDatabase(getApplication()).trackDao() }
@@ -139,6 +142,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     _isPlaying.value = isPlaying
                 }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    Log.e("MusicViewModel", "Playback failed: ${error.message}", error)
+                    _isBuffering.value = false
+                    _isPlaying.value = false
+                    _errorMessage.value = "Playback failed. Try another result or search again."
+                }
             }
         )
     }
@@ -179,21 +189,52 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                _mediaController.value?.let { controller ->
-                    controller.setMediaItem(MediaItem.fromUri(url))
-                    controller.prepare()
-                    controller.play()
-                    _isPlaying.value = controller.isPlaying
-                } ?: run {
+                val controller = getControllerForPlayback()
+                if (controller == null) {
                     _errorMessage.value = "Player connection failed. Restart the app."
                     _isBuffering.value = false
+                    return@launch
                 }
+
+                controller.setMediaItem(result.toMediaItem(url))
+                controller.prepare()
+                controller.play()
+                _isPlaying.value = controller.isPlaying
             } catch (error: Exception) {
                 _errorMessage.value = error.message ?: "Playback failed. Try again."
                 _isBuffering.value = false
             }
         }
     }
+
+    private suspend fun getControllerForPlayback(): MediaController? {
+        _mediaController.value?.let { return it }
+        return try {
+            val controller = withContext(Dispatchers.IO) {
+                controllerFuture?.get(5, TimeUnit.SECONDS)
+            }
+            if (controller != null) {
+                _mediaController.value = controller
+                setupPlayerListener(controller)
+                startPlaybackProgressTracker()
+            }
+            controller
+        } catch (error: Exception) {
+            Log.e("MusicViewModel", "MediaController unavailable for playback", error)
+            null
+        }
+    }
+
+    private fun SearchResult.toMediaItem(streamUrl: String): MediaItem = MediaItem.Builder()
+        .setUri(streamUrl)
+        .setMediaId(videoId)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(title)
+                .setArtist(channelName)
+                .build()
+        )
+        .build()
 
     private fun startPlaybackProgressTracker() {
         progressJob?.cancel()
@@ -220,7 +261,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     controller.play()
                 }
-                _isPlaying.value = controller.isPlaying
             } ?: run {
                 _errorMessage.value = "Player connection failed. Restart the app."
             }
