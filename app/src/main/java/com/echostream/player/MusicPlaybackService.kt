@@ -48,6 +48,7 @@ class MusicPlaybackService : MediaSessionService() {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
         val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
+            .setDefaultRequestProperties(defaultPlaybackHeaders())
 
 
         player = ExoPlayer.Builder(this)
