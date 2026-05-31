@@ -44,11 +44,11 @@ class MusicPlaybackService : MediaSessionService() {
         val okHttpClient = OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
-
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
         val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setDefaultRequestProperties(defaultPlaybackHeaders())
+
 
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
