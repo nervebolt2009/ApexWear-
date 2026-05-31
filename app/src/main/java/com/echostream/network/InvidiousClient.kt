@@ -565,7 +565,7 @@ class InvidiousClient {
      *
      * @return The selected stream URL, or `null` if no usable URL is present.
      */
-
+    private fun parsePipedStreamUrl(body: String): String? {
         val root = JSONObject(body)
         val audioStreams = root.optJSONArray("audioStreams")
         selectBestStreamUrl(audioStreams, ::scoreAudioStream)?.let { return it }
