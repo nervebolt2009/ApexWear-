@@ -11,7 +11,6 @@
 
 # ── Media3 / ExoPlayer ───────────────────────────────────────────────────────
 -keep class androidx.media3.** { *; }
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 -keep class androidx.wear.compose.** { *; }
 -keepattributes Signature, Exceptions, InnerClasses
 -keep class org.schabi.newpipe.extractor.** { *; }
@@ -51,7 +50,6 @@
 -dontwarn kotlin.**
 
 # ── Kotlin Coroutines ─────────────────────────────────────────────────────────
- main
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 -keepclassmembernames class kotlinx.coroutines.** { volatile <fields>; }
