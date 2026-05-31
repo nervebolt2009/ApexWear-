@@ -205,14 +205,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                 val controller = getControllerForPlayback()
                 if (controller == null) {
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
                 _mediaController.value?.let { controller ->
                     controller.setMediaItem(MediaItem.fromUri(url))
                     controller.prepare()
                     controller.play()
                 } ?: run {
- main
                     _errorMessage.value = "Player connection failed. Restart the app."
                     _isBuffering.value = false
                     return@launch
@@ -229,14 +227,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
         
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Ensures a MediaController is available for playback by returning the existing controller or waiting up to 5 seconds for the async controller build; when obtained, stores it and initializes the player listener and playback progress tracker.
      *
      * @return The prepared `MediaController` if available, `null` otherwise.
      */
- main
     private suspend fun getControllerForPlayback(): MediaController? {
         _mediaController.value?.let { return it }
         return try {
@@ -255,7 +251,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
     private fun SearchResult.toMediaItem(streamUrl: String): MediaItem = MediaItem.Builder()
 
     /**
@@ -265,7 +260,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
          * @return A configured MediaItem whose URI is `streamUrl`, whose mediaId is this result's `videoId`, and whose metadata contains the result's `title` and `channelName` as artist.
          */
         private fun SearchResult.toMediaItem(streamUrl: String): MediaItem = MediaItem.Builder()
- main
         .setUri(streamUrl)
         .setMediaId(videoId)
         .setMediaMetadata(
@@ -276,7 +270,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         )
         .build()
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Starts a periodic tracker that polls the current MediaController and updates playback state flows.
@@ -289,7 +282,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
      *
      * Cancels any existing tracker before starting a new one.
      */
- main
     private fun startPlaybackProgressTracker() {
         progressJob?.cancel()
         progressJob = viewModelScope.launch(Dispatchers.Main) {
