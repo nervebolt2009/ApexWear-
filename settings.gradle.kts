@@ -11,8 +11,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://jitpack.io")
+            content {
+                includeGroup("com.github.TeamNewPipe")
+            }
+        }
     }
 }
 
-rootProject.name = "EchoStream"
+
 include(":app")
