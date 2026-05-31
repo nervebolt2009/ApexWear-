@@ -251,7 +251,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun SearchResult.toMediaItem(streamUrl: String): MediaItem = MediaItem.Builder()
 
     /**
          * Builds a MediaItem for this SearchResult using the provided audio stream URL.
