@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
     implementation(libs.okhttp)
+    implementation(libs.newpipe.extractor)
     implementation(libs.moshi.kotlin)
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.lifecycle.runtime.compose)
