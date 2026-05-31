@@ -22,6 +22,19 @@ class InvidiousClient {
         "https://vid.puffyan.us"
     )
 
+    private val pipedInstances = listOf(
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi-libre.kavin.rocks",
+        "https://api.piped.private.coffee",
+        "https://pipedapi.adminforge.de",
+        "https://piped-api.privacy.com.de",
+        "https://api.piped.yt",
+        "https://pipedapi.drgns.space",
+        "https://pipedapi.owo.si",
+        "https://pipedapi.ducks.party",
+        "https://piped-api.codespace.cz"
+    )
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -76,6 +89,13 @@ class InvidiousClient {
         searchYouTubeMusic(query)
     }
 
+    /**
+     * Selects an audio stream URL for the given YouTube video by probing configured Invidious instances and,
+     * if those fail to produce a usable audio URL, falling back to the YouTube player stream and Piped endpoints.
+     *
+     * @param videoId The YouTube video identifier to fetch streams for.
+     * @return The selected audio stream URL, or `null` if no usable stream was found.
+     */
     suspend fun fetchAudioStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
         ensureInstancesInitialized()
         healthyInstances.forEach { instance ->
@@ -88,15 +108,21 @@ class InvidiousClient {
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("HTTP ${response.code}")
                     val body = response.body?.string().orEmpty()
+                    if (!body.looksLikeJson()) error("Non-JSON response from $instance")
                     parseInvidiousAudioUrl(body)?.let { return@withContext it }
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Stream fetch failed for $instance", error)
             }
         }
-        fetchPipedAudioStreamUrl(videoId)
+        fetchYouTubePlayerStreamUrl(videoId) ?: fetchPipedAudioStreamUrl(videoId)
     }
 
+    /**
+     * Ensures the cached list of healthy Invidious instances is populated.
+     *
+     * If no healthy instances are recorded, assigns the configured `instances` list to `healthyInstances`.
+     */
     private fun ensureInstancesInitialized() {
         if (healthyInstances.isEmpty()) {
             healthyInstances = instances
@@ -322,6 +348,12 @@ class InvidiousClient {
         }
     }.orEmpty().ifBlank { optString("simpleText") }
 
+    /**
+     * Extracts the highest-bitrate audio stream URL from an Invidious video JSON response.
+     *
+     * @param body JSON response body returned by an Invidious `/api/v1/videos` request.
+     * @return The URL of the highest-bitrate audio stream whose MIME indicates `audio/webm` or `audio/mp4`, or `null` if none is found.
+     */
     private fun parseInvidiousAudioUrl(body: String): String? {
         val formats = JSONObject(body).optJSONArray("adaptiveFormats") ?: return null
         return selectHighestBitrateUrl(formats) { format ->
@@ -330,45 +362,219 @@ class InvidiousClient {
         }
     }
 
-    private fun fetchPipedAudioStreamUrl(videoId: String): String? {
+
+    /**
+     * Attempts to obtain an audio stream URL for the specified YouTube video using the YouTube Music player API.
+     *
+     * @param videoId The YouTube video identifier to fetch a player stream for.
+     * @return The selected audio stream URL as a `String`, or `null` if no usable stream could be retrieved.
+     */
+    private fun fetchYouTubePlayerStreamUrl(videoId: String): String? {
         return try {
+            val requestBody = JSONObject()
+                .put(
+                    "context",
+                    JSONObject().put(
+                        "client",
+                        JSONObject()
+                            .put("clientName", "ANDROID_MUSIC")
+                            .put("clientVersion", "7.03.52")
+                            .put("androidSdkVersion", 34)
+                    )
+                )
+                .put("videoId", videoId)
+                .put("contentCheckOk", true)
+                .put("racyCheckOk", true)
+                .toString()
+                .toRequestBody(JSON_MEDIA_TYPE)
+
             val request = Request.Builder()
-                .url("https://pipedapi.kavin.rocks/streams/$videoId")
+                .url("https://music.youtube.com/youtubei/v1/player?key=$YOUTUBE_MUSIC_KEY")
                 .defaultHeaders()
-                .get()
+                .header("Origin", "https://music.youtube.com")
+                .header("Referer", "https://music.youtube.com/watch?v=$videoId")
+                .header("X-YouTube-Client-Name", "21")
+                .header("X-YouTube-Client-Version", "7.03.52")
+                .post(requestBody)
                 .build()
+
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("HTTP ${response.code}")
                 val body = response.body?.string().orEmpty()
-                val streams = JSONObject(body).optJSONArray("audioStreams") ?: return null
-                selectHighestBitrateUrl(streams) { true }
+                if (!body.looksLikeJson()) error("Non-JSON response from YouTube player")
+                parseYouTubePlayerStreamUrl(body)
             }
         } catch (error: Exception) {
-            Log.e(TAG, "Piped stream fetch failed", error)
+            Log.e(TAG, "YouTube player stream fetch failed", error)
             null
         }
     }
 
+    /**
+     * Attempts to retrieve an audio stream URL for the given video from configured Piped instances.
+     *
+     * @param videoId The video identifier to request streams for.
+     * @return The selected audio stream URL, or `null` if no playable stream was found.
+     */
+    private fun fetchPipedAudioStreamUrl(videoId: String): String? {
+        pipedInstances.forEach { instance ->
+            try {
+                val request = Request.Builder()
+                    .url("$instance/streams/$videoId")
+                    .defaultHeaders()
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) error("HTTP ${response.code}")
+                    val body = response.body?.string().orEmpty()
+                    if (!body.looksLikeJson()) error("Non-JSON response from $instance")
+                    parsePipedStreamUrl(body)?.let { return it }
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Piped stream fetch failed for $instance", error)
+            }
+        }
+        return null
+    }
+
+
+    /**
+     * Selects the best audio or playable stream URL from a YouTube player JSON response.
+     *
+     * Parses the provided YouTube player response JSON and first attempts to choose the highest-scoring
+     * audio stream from `streamingData.adaptiveFormats`. If no audio adaptive stream is selected, it
+     * falls back to choosing the best playable stream from `streamingData.formats`.
+     *
+     * @param body The raw JSON response body returned by the YouTube player endpoint.
+     * @return The selected stream URL, or `null` if no suitable stream was found.
+     */
+    private fun parseYouTubePlayerStreamUrl(body: String): String? {
+        val streamingData = JSONObject(body).optJSONObject("streamingData") ?: return null
+        val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
+        selectBestStreamUrl(adaptiveFormats) { format ->
+            val url = format.optString("url")
+            val type = format.optString("mimeType")
+            if (url.isNotBlank() && type.startsWith("audio/", ignoreCase = true)) scoreAudioStream(format) else null
+        }?.let { return it }
+
+        val formats = streamingData.optJSONArray("formats")
+        return selectBestStreamUrl(formats, ::scorePlayableVideoStream)
+    }
+
+    /**
+     * Selects the most suitable stream URL from a Piped JSON response.
+     *
+     * First attempts to choose the best audio stream from `audioStreams`, then a playable
+     * video stream from `videoStreams`, and finally falls back to the `hls` field.
+     *
+     * @return The selected stream URL, or `null` if no usable URL is present.
+     */
+    private fun parsePipedStreamUrl(body: String): String? {
+        val root = JSONObject(body)
+        val audioStreams = root.optJSONArray("audioStreams")
+        selectBestStreamUrl(audioStreams, ::scoreAudioStream)?.let { return it }
+
+        val videoStreams = root.optJSONArray("videoStreams")
+        selectBestStreamUrl(videoStreams, ::scorePlayableVideoStream)?.let { return it }
+
+        val hls = root.optString("hls")
+        return hls.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * Selects the stream URL with the highest audio score among formats that satisfy the given predicate.
+     *
+     * @param formats A JSONArray of format objects to evaluate.
+     * @param predicate A predicate invoked for each format; formats for which this returns `true` are scored using the audio scoring function and considered for selection.
+     * @return The URL of the best-scoring matching format, or `null` if none qualify.
+     */
     private fun selectHighestBitrateUrl(
         formats: JSONArray,
         predicate: (JSONObject) -> Boolean
+    ): String? = selectBestStreamUrl(formats) { format ->
+        if (predicate(format)) scoreAudioStream(format) else null
+    }
+
+    /**
+     * Selects the highest-scoring stream URL from an array of format objects.
+     *
+     * @param formats A JSONArray of format JSONObject entries to evaluate; each object is expected to contain a `url` field.
+     * @param score A scoring function that returns an Int score for a given format JSONObject or `null` to exclude that format.
+     * @return The `url` of the format with the highest score, or `null` if no valid URL was found or `formats` is empty.
+     */
+    private fun selectBestStreamUrl(
+        formats: JSONArray?,
+        score: (JSONObject) -> Int?
     ): String? {
+        if (formats == null || formats.length() == 0) return null
         var selectedUrl: String? = null
-        var selectedBitrate = -1
+        var selectedScore = Int.MIN_VALUE
         for (index in 0 until formats.length()) {
             val format = formats.optJSONObject(index) ?: continue
-            if (!predicate(format)) continue
-            val bitrate = format.optInt("bitrate", 0)
             val url = format.optString("url")
-            if (url.isNotBlank() && bitrate > selectedBitrate) {
-                selectedBitrate = bitrate
+            val formatScore = score(format) ?: continue
+            if (url.isBlank()) continue
+            if (formatScore > selectedScore) {
+                selectedScore = formatScore
                 selectedUrl = url
             }
         }
         return selectedUrl
     }
 
-    private fun Request.Builder.defaultHeaders(): Request.Builder = header("User-Agent", USER_AGENT)
+    /**
+     * Computes a numeric desirability score for an audio stream format.
+     *
+     * @param format A JSON object describing a stream format (expected keys include `type`/`mimeType`, `container`/`format`, and `bitrate` or `quality`).
+     * @return An integer score where higher values indicate a more desirable audio stream. Preferred codecs/containers receive large base scores (MP4/m4a > WebM) and the returned score is increased by the format's `bitrate` (or `quality`) value.
+     */
+    private fun scoreAudioStream(format: JSONObject): Int {
+        val type = format.optString("type", format.optString("mimeType"))
+        val container = format.optString("container", format.optString("format"))
+        val codecScore = when {
+            type.contains("audio/mp4", ignoreCase = true) || container.contains("m4a", ignoreCase = true) -> 2_000_000
+            type.contains("audio/webm", ignoreCase = true) || container.contains("webm", ignoreCase = true) -> 1_000_000
+            else -> 0
+        }
+        return codecScore + format.optInt("bitrate", format.optInt("quality", 0))
+    }
+
+    /**
+     * Score a stream format for suitability as a playable video stream (MP4 or HLS).
+     *
+     * Returns a higher score for MP4 over HLS and adds the format's bitrate and height to prefer higher-quality streams.
+     *
+     * @param format A JSON object describing a stream format; expected keys include `type`/`mimeType`, `container`/`format`, `bitrate`, `height`, and `videoOnly`.
+     * @return An integer score where higher is better, or `null` if the format is video-only or not an MP4/HLS playable stream.
+     */
+    private fun scorePlayableVideoStream(format: JSONObject): Int? {
+        if (format.optBoolean("videoOnly", false)) return null
+        val type = format.optString("type", format.optString("mimeType"))
+        val container = format.optString("container", format.optString("format"))
+        val isHls = type.contains("mpegurl", ignoreCase = true) || container.contains("hls", ignoreCase = true)
+        val isMp4 = type.contains("video/mp4", ignoreCase = true) || container.contains("mp4", ignoreCase = true)
+        if (!isMp4 && !isHls) return null
+        val formatScore = when {
+            isMp4 -> 2_000_000
+            isHls -> 1_000_000
+            else -> 0
+        }
+        return formatScore + format.optInt("bitrate", 0) + format.optInt("height", 0)
+    }
+
+    /**
+ * Determines whether the string appears to be JSON by checking if, after skipping leading whitespace, it starts with `{` or `[` .
+ *
+ * @return `true` if the string (ignoring leading whitespace) begins with `{` or `[`, `false` otherwise.
+ */
+private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{") || it.startsWith("[") }
+
+    /**
+         * Adds the standard default HTTP headers used by the client to this request builder.
+         *
+         * @return The same [Request.Builder] with the default headers applied.
+         */
+        private fun Request.Builder.defaultHeaders(): Request.Builder = header("User-Agent", USER_AGENT)
         .header("Accept", "application/json,text/plain,*/*")
         .header("Accept-Language", "en-US,en;q=0.9")
 
