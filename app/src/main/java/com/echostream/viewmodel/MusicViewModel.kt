@@ -205,11 +205,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                 val controller = getControllerForPlayback()
                 if (controller == null) {
-                _mediaController.value?.let { controller ->
-                    controller.setMediaItem(MediaItem.fromUri(url))
-                    controller.prepare()
-                    controller.play()
-                } ?: run {
                     _errorMessage.value = "Player connection failed. Restart the app."
                     _isBuffering.value = false
                     return@launch
@@ -225,6 +220,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+        
 
     /**
      * Ensures a MediaController is available for playback by returning the existing controller or waiting up to 5 seconds for the async controller build; when obtained, stores it and initializes the player listener and playback progress tracker.
@@ -249,6 +245,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+
     /**
          * Builds a MediaItem for this SearchResult using the provided audio stream URL.
          *
@@ -265,6 +262,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 .build()
         )
         .build()
+
 
     /**
      * Starts a periodic tracker that polls the current MediaController and updates playback state flows.

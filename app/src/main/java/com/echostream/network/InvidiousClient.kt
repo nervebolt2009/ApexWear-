@@ -363,6 +363,7 @@ class InvidiousClient {
     }
 
 
+
     /**
      * Attempts to obtain an audio stream URL for the specified YouTube video using the YouTube Music player API.
      *
@@ -410,6 +411,7 @@ class InvidiousClient {
         }
     }
 
+
     /**
      * Attempts to retrieve an audio stream URL for the given video from configured Piped instances.
      *
@@ -438,6 +440,7 @@ class InvidiousClient {
     }
 
 
+
     /**
      * Selects the best audio or playable stream URL from a YouTube player JSON response.
      *
@@ -461,6 +464,7 @@ class InvidiousClient {
         return selectBestStreamUrl(formats, ::scorePlayableVideoStream)
     }
 
+
     /**
      * Selects the most suitable stream URL from a Piped JSON response.
      *
@@ -481,6 +485,7 @@ class InvidiousClient {
         return hls.takeIf { it.isNotBlank() }
     }
 
+
     /**
      * Selects the stream URL with the highest audio score among formats that satisfy the given predicate.
      *
@@ -494,6 +499,7 @@ class InvidiousClient {
     ): String? = selectBestStreamUrl(formats) { format ->
         if (predicate(format)) scoreAudioStream(format) else null
     }
+
 
     /**
      * Selects the highest-scoring stream URL from an array of format objects.
@@ -522,6 +528,7 @@ class InvidiousClient {
         return selectedUrl
     }
 
+
     /**
      * Computes a numeric desirability score for an audio stream format.
      *
@@ -538,6 +545,7 @@ class InvidiousClient {
         }
         return codecScore + format.optInt("bitrate", format.optInt("quality", 0))
     }
+
 
     /**
      * Score a stream format for suitability as a playable video stream (MP4 or HLS).
@@ -562,12 +570,8 @@ class InvidiousClient {
         return formatScore + format.optInt("bitrate", 0) + format.optInt("height", 0)
     }
 
-    /**
- * Determines whether the string appears to be JSON by checking if, after skipping leading whitespace, it starts with `{` or `[` .
- *
- * @return `true` if the string (ignoring leading whitespace) begins with `{` or `[`, `false` otherwise.
- */
-private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{") || it.startsWith("[") }
+    private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{") || it.startsWith("[") }
+
 
     /**
          * Adds the standard default HTTP headers used by the client to this request builder.

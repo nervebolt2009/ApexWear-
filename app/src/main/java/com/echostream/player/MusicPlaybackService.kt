@@ -40,6 +40,7 @@ class MusicPlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+
         val httpClient = OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
@@ -51,15 +52,6 @@ class MusicPlaybackService : MediaSessionService() {
 
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-        val okHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
-        val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setUserAgent("Mozilla/5.0 (Linux; Android 14; Wear OS) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 EchoStream/1.0")
-
-        player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -128,6 +120,7 @@ class MusicPlaybackService : MediaSessionService() {
         }
         super.onDestroy()
     }
+
 
     /**
      * Provides the default HTTP headers applied to media playback requests.
