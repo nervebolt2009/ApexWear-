@@ -8,12 +8,17 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
+@OptIn(UnstableApi::class)
 class MusicPlaybackService : MediaSessionService() {
 
     private lateinit var player: ExoPlayer
@@ -29,7 +34,17 @@ class MusicPlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+        val httpClient = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+        val dataSourceFactory = OkHttpDataSource.Factory(httpClient)
+            .setDefaultRequestProperties(defaultPlaybackHeaders())
+
         player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -67,6 +82,12 @@ class MusicPlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
+    private fun defaultPlaybackHeaders(): Map<String, String> = mapOf(
+        "User-Agent" to USER_AGENT,
+        "Accept" to "audio/webm,audio/mp4,video/webm,video/mp4,application/x-mpegurl,*/*",
+        "Accept-Language" to "en-US,en;q=0.9"
+    )
+
     private inner class EchoStreamSessionCallback : MediaSession.Callback {
         override fun onAddMediaItems(
             mediaSession: MediaSession,
@@ -90,5 +111,9 @@ class MusicPlaybackService : MediaSessionService() {
                 )
             )
         }
+    }
+
+    private companion object {
+        const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Wear OS) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 EchoStream/1.0"
     }
 }

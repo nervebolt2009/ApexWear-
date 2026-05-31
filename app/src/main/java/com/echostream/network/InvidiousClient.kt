@@ -22,6 +22,19 @@ class InvidiousClient {
         "https://vid.puffyan.us"
     )
 
+    private val pipedInstances = listOf(
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi-libre.kavin.rocks",
+        "https://api.piped.private.coffee",
+        "https://pipedapi.adminforge.de",
+        "https://piped-api.privacy.com.de",
+        "https://api.piped.yt",
+        "https://pipedapi.drgns.space",
+        "https://pipedapi.owo.si",
+        "https://pipedapi.ducks.party",
+        "https://piped-api.codespace.cz"
+    )
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -88,13 +101,14 @@ class InvidiousClient {
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("HTTP ${response.code}")
                     val body = response.body?.string().orEmpty()
+                    if (!body.looksLikeJson()) error("Non-JSON response from $instance")
                     parseInvidiousAudioUrl(body)?.let { return@withContext it }
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Stream fetch failed for $instance", error)
             }
         }
-        fetchPipedAudioStreamUrl(videoId)
+        fetchYouTubePlayerStreamUrl(videoId) ?: fetchPipedAudioStreamUrl(videoId)
     }
 
     private fun ensureInstancesInitialized() {
@@ -330,43 +344,149 @@ class InvidiousClient {
         }
     }
 
-    private fun fetchPipedAudioStreamUrl(videoId: String): String? {
+
+    private fun fetchYouTubePlayerStreamUrl(videoId: String): String? {
         return try {
+            val requestBody = JSONObject()
+                .put(
+                    "context",
+                    JSONObject().put(
+                        "client",
+                        JSONObject()
+                            .put("clientName", "ANDROID_MUSIC")
+                            .put("clientVersion", "7.03.52")
+                            .put("androidSdkVersion", 34)
+                    )
+                )
+                .put("videoId", videoId)
+                .put("contentCheckOk", true)
+                .put("racyCheckOk", true)
+                .toString()
+                .toRequestBody(JSON_MEDIA_TYPE)
+
             val request = Request.Builder()
-                .url("https://pipedapi.kavin.rocks/streams/$videoId")
+                .url("https://music.youtube.com/youtubei/v1/player?key=$YOUTUBE_MUSIC_KEY")
                 .defaultHeaders()
-                .get()
+                .header("Origin", "https://music.youtube.com")
+                .header("Referer", "https://music.youtube.com/watch?v=$videoId")
+                .header("X-YouTube-Client-Name", "21")
+                .header("X-YouTube-Client-Version", "7.03.52")
+                .post(requestBody)
                 .build()
+
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("HTTP ${response.code}")
                 val body = response.body?.string().orEmpty()
-                val streams = JSONObject(body).optJSONArray("audioStreams") ?: return null
-                selectHighestBitrateUrl(streams) { true }
+                if (!body.looksLikeJson()) error("Non-JSON response from YouTube player")
+                parseYouTubePlayerStreamUrl(body)
             }
         } catch (error: Exception) {
-            Log.e(TAG, "Piped stream fetch failed", error)
+            Log.e(TAG, "YouTube player stream fetch failed", error)
             null
         }
+    }
+
+    private fun fetchPipedAudioStreamUrl(videoId: String): String? {
+        pipedInstances.forEach { instance ->
+            try {
+                val request = Request.Builder()
+                    .url("$instance/streams/$videoId")
+                    .defaultHeaders()
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) error("HTTP ${response.code}")
+                    val body = response.body?.string().orEmpty()
+                    if (!body.looksLikeJson()) error("Non-JSON response from $instance")
+                    parsePipedStreamUrl(body)?.let { return it }
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Piped stream fetch failed for $instance", error)
+            }
+        }
+        return null
+    }
+
+
+    private fun parseYouTubePlayerStreamUrl(body: String): String? {
+        val streamingData = JSONObject(body).optJSONObject("streamingData") ?: return null
+        val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
+        selectBestStreamUrl(adaptiveFormats) { format ->
+            val url = format.optString("url")
+            val type = format.optString("mimeType")
+            if (url.isNotBlank() && type.startsWith("audio/", ignoreCase = true)) scoreAudioStream(format) else null
+        }?.let { return it }
+
+        val formats = streamingData.optJSONArray("formats")
+        return selectBestStreamUrl(formats, ::scorePlayableVideoStream)
+    }
+
+    private fun parsePipedStreamUrl(body: String): String? {
+        val root = JSONObject(body)
+        val audioStreams = root.optJSONArray("audioStreams")
+        selectBestStreamUrl(audioStreams, ::scoreAudioStream)?.let { return it }
+
+        val videoStreams = root.optJSONArray("videoStreams")
+        selectBestStreamUrl(videoStreams, ::scorePlayableVideoStream)?.let { return it }
+
+        val hls = root.optString("hls")
+        return hls.takeIf { it.isNotBlank() }
     }
 
     private fun selectHighestBitrateUrl(
         formats: JSONArray,
         predicate: (JSONObject) -> Boolean
+    ): String? = selectBestStreamUrl(formats) { format ->
+        if (predicate(format)) scoreAudioStream(format) else null
+    }
+
+    private fun selectBestStreamUrl(
+        formats: JSONArray?,
+        score: (JSONObject) -> Int?
     ): String? {
+        if (formats == null || formats.length() == 0) return null
         var selectedUrl: String? = null
-        var selectedBitrate = -1
+        var selectedScore = Int.MIN_VALUE
         for (index in 0 until formats.length()) {
             val format = formats.optJSONObject(index) ?: continue
-            if (!predicate(format)) continue
-            val bitrate = format.optInt("bitrate", 0)
             val url = format.optString("url")
-            if (url.isNotBlank() && bitrate > selectedBitrate) {
-                selectedBitrate = bitrate
+            val formatScore = score(format) ?: continue
+            if (url.isBlank()) continue
+            if (formatScore > selectedScore) {
+                selectedScore = formatScore
                 selectedUrl = url
             }
         }
         return selectedUrl
     }
+
+    private fun scoreAudioStream(format: JSONObject): Int {
+        val type = format.optString("type", format.optString("mimeType"))
+        val container = format.optString("container", format.optString("format"))
+        val codecScore = when {
+            type.contains("audio/mp4", ignoreCase = true) || container.contains("m4a", ignoreCase = true) -> 2_000_000
+            type.contains("audio/webm", ignoreCase = true) || container.contains("webm", ignoreCase = true) -> 1_000_000
+            else -> 0
+        }
+        return codecScore + format.optInt("bitrate", format.optInt("quality", 0))
+    }
+
+    private fun scorePlayableVideoStream(format: JSONObject): Int? {
+        if (format.optBoolean("videoOnly", false)) return null
+        val type = format.optString("type", format.optString("mimeType"))
+        val container = format.optString("container", format.optString("format"))
+        val isHls = type.contains("mpegurl", ignoreCase = true) || container.contains("hls", ignoreCase = true)
+        val isMp4 = type.contains("video/mp4", ignoreCase = true) || container.contains("mp4", ignoreCase = true)
+        if (!isMp4 && !isHls) return null
+        val formatScore = when {
+            isMp4 -> 2_000_000
+            isHls -> 1_000_000
+            else -> 0
+        }
+        return formatScore + format.optInt("bitrate", 0) + format.optInt("height", 0)
+    }
+
+    private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{") || it.startsWith("[") }
 
     private fun Request.Builder.defaultHeaders(): Request.Builder = header("User-Agent", USER_AGENT)
         .header("Accept", "application/json,text/plain,*/*")
