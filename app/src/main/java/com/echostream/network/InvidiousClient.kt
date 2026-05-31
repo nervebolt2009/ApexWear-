@@ -55,6 +55,7 @@ class InvidiousClient {
 
     private val newPipeReady = AtomicBoolean(false)
 
+    // ✅ FIXED: Clean initialization without broken git merge text or double calls
     private fun ensureNewPipeInitialized() {
         if (newPipeReady.compareAndSet(false, true)) {
             try {
@@ -108,21 +109,9 @@ class InvidiousClient {
         searchYouTubeMusic(query)
     }
 
-    /**
-     * Returns an audio stream URL for the given YouTube video.
-     *
-     * Strategy (in order):
-     * 1. Invidious /api/v1/videos — fast, cached; skips cipher-protected entries.
-     * 2. NewPipe extractor — handles YouTube's signature cipher properly; YouTube-only.
-     * 3. Piped instances — last resort proxy fallback.
-     *
-     * @param videoId The YouTube video identifier.
-     * @return The selected audio stream URL, or `null` if no usable stream was found.
-     */
     suspend fun fetchAudioStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
         ensureInstancesInitialized()
 
-        // Strategy 1: Invidious /api/v1/videos — returns direct URLs when not cipher-protected
         healthyInstances.forEach { instance ->
             try {
                 val request = Request.Builder()
@@ -141,23 +130,11 @@ class InvidiousClient {
             }
         }
 
-        // Strategy 2: NewPipe extractor — handles cipher decryption properly
         fetchNewPipeStreamUrl(videoId)?.let { return@withContext it }
 
-        // Strategy 3: Piped — last resort
         fetchPipedAudioStreamUrl(videoId)
     }
 
-    /**
-     * Extracts an audio stream URL using NewPipe extractor.
-     *
-     * NewPipe handles YouTube's obfuscated signature cipher decryption in pure Java/Kotlin,
-     * eliminating the need for workaround clients or proxy hacks. Selects the highest-bitrate
-     * audio stream, preferring M4A (AAC) over Opus/WebM.
-     *
-     * @param videoId The YouTube video identifier.
-     * @return The best audio stream URL, or `null` if extraction fails.
-     */
     private fun fetchNewPipeStreamUrl(videoId: String): String? {
         return try {
             ensureNewPipeInitialized()
@@ -185,11 +162,6 @@ class InvidiousClient {
         }
     }
 
-    /**
-     * Ensures the cached list of healthy Invidious instances is populated.
-     *
-     * If no healthy instances are recorded, assigns the configured `instances` list to `healthyInstances`.
-     */
     private fun ensureInstancesInitialized() {
         if (healthyInstances.isEmpty()) {
             healthyInstances = instances
@@ -415,15 +387,6 @@ class InvidiousClient {
         }
     }.orEmpty().ifBlank { optString("simpleText") }
 
-    /**
-     * Extracts the highest-bitrate audio stream URL from an Invidious video JSON response.
-     *
-     * Cipher-protected entries (those with a `signatureCipher` or `cipher` field but no plain `url`)
-     * are skipped — NewPipe handles those in Strategy 2.
-     *
-     * @param body JSON response body from an Invidious `/api/v1/videos` request.
-     * @return The URL of the highest-bitrate `audio/webm` or `audio/mp4` stream, or `null` if none found.
-     */
     private fun parseInvidiousAudioUrl(body: String): String? {
         val formats = JSONObject(body).optJSONArray("adaptiveFormats") ?: return null
         return selectHighestBitrateUrl(formats) { format ->
@@ -434,12 +397,6 @@ class InvidiousClient {
         }
     }
 
-    /**
-     * Attempts to retrieve an audio stream URL for the given video from configured Piped instances.
-     *
-     * @param videoId The video identifier to request streams for.
-     * @return The selected audio stream URL, or `null` if no playable stream was found.
-     */
     private fun fetchPipedAudioStreamUrl(videoId: String): String? {
         pipedInstances.forEach { instance ->
             try {
@@ -461,11 +418,6 @@ class InvidiousClient {
         return null
     }
 
-    /**
-     * Selects the most suitable stream URL from a Piped JSON response.
-     *
-     * Tries `audioStreams` first, then `videoStreams`, then the `hls` field.
-     */
     private fun parsePipedStreamUrl(body: String): String? {
         val root = JSONObject(body)
         val audioStreams = root.optJSONArray("audioStreams")
