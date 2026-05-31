@@ -363,7 +363,6 @@ class InvidiousClient {
     }
 
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Attempts to obtain an audio stream URL for the specified YouTube video using the YouTube Music player API.
@@ -371,7 +370,6 @@ class InvidiousClient {
      * @param videoId The YouTube video identifier to fetch a player stream for.
      * @return The selected audio stream URL as a `String`, or `null` if no usable stream could be retrieved.
      */
- main
     private fun fetchYouTubePlayerStreamUrl(videoId: String): String? {
         return try {
             val requestBody = JSONObject()
@@ -413,7 +411,6 @@ class InvidiousClient {
         }
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Attempts to retrieve an audio stream URL for the given video from configured Piped instances.
@@ -421,7 +418,6 @@ class InvidiousClient {
      * @param videoId The video identifier to request streams for.
      * @return The selected audio stream URL, or `null` if no playable stream was found.
      */
- main
     private fun fetchPipedAudioStreamUrl(videoId: String): String? {
         pipedInstances.forEach { instance ->
             try {
@@ -444,7 +440,6 @@ class InvidiousClient {
     }
 
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Selects the best audio or playable stream URL from a YouTube player JSON response.
@@ -456,7 +451,6 @@ class InvidiousClient {
      * @param body The raw JSON response body returned by the YouTube player endpoint.
      * @return The selected stream URL, or `null` if no suitable stream was found.
      */
- main
     private fun parseYouTubePlayerStreamUrl(body: String): String? {
         val streamingData = JSONObject(body).optJSONObject("streamingData") ?: return null
         val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
@@ -470,7 +464,6 @@ class InvidiousClient {
         return selectBestStreamUrl(formats, ::scorePlayableVideoStream)
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Selects the most suitable stream URL from a Piped JSON response.
@@ -480,7 +473,6 @@ class InvidiousClient {
      *
      * @return The selected stream URL, or `null` if no usable URL is present.
      */
- main
     private fun parsePipedStreamUrl(body: String): String? {
         val root = JSONObject(body)
         val audioStreams = root.optJSONArray("audioStreams")
@@ -493,7 +485,6 @@ class InvidiousClient {
         return hls.takeIf { it.isNotBlank() }
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Selects the stream URL with the highest audio score among formats that satisfy the given predicate.
@@ -502,7 +493,6 @@ class InvidiousClient {
      * @param predicate A predicate invoked for each format; formats for which this returns `true` are scored using the audio scoring function and considered for selection.
      * @return The URL of the best-scoring matching format, or `null` if none qualify.
      */
- main
     private fun selectHighestBitrateUrl(
         formats: JSONArray,
         predicate: (JSONObject) -> Boolean
@@ -510,7 +500,6 @@ class InvidiousClient {
         if (predicate(format)) scoreAudioStream(format) else null
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Selects the highest-scoring stream URL from an array of format objects.
@@ -519,7 +508,6 @@ class InvidiousClient {
      * @param score A scoring function that returns an Int score for a given format JSONObject or `null` to exclude that format.
      * @return The `url` of the format with the highest score, or `null` if no valid URL was found or `formats` is empty.
      */
- main
     private fun selectBestStreamUrl(
         formats: JSONArray?,
         score: (JSONObject) -> Int?
@@ -540,7 +528,6 @@ class InvidiousClient {
         return selectedUrl
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Computes a numeric desirability score for an audio stream format.
@@ -548,7 +535,6 @@ class InvidiousClient {
      * @param format A JSON object describing a stream format (expected keys include `type`/`mimeType`, `container`/`format`, and `bitrate` or `quality`).
      * @return An integer score where higher values indicate a more desirable audio stream. Preferred codecs/containers receive large base scores (MP4/m4a > WebM) and the returned score is increased by the format's `bitrate` (or `quality`) value.
      */
- main
     private fun scoreAudioStream(format: JSONObject): Int {
         val type = format.optString("type", format.optString("mimeType"))
         val container = format.optString("container", format.optString("format"))
@@ -560,7 +546,6 @@ class InvidiousClient {
         return codecScore + format.optInt("bitrate", format.optInt("quality", 0))
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Score a stream format for suitability as a playable video stream (MP4 or HLS).
@@ -570,7 +555,6 @@ class InvidiousClient {
      * @param format A JSON object describing a stream format; expected keys include `type`/`mimeType`, `container`/`format`, `bitrate`, `height`, and `videoOnly`.
      * @return An integer score where higher is better, or `null` if the format is video-only or not an MP4/HLS playable stream.
      */
- main
     private fun scorePlayableVideoStream(format: JSONObject): Int? {
         if (format.optBoolean("videoOnly", false)) return null
         val type = format.optString("type", format.optString("mimeType"))
@@ -586,17 +570,8 @@ class InvidiousClient {
         return formatScore + format.optInt("bitrate", 0) + format.optInt("height", 0)
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
     private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{") || it.startsWith("[") }
 
-    private fun Request.Builder.defaultHeaders(): Request.Builder = header("User-Agent", USER_AGENT)
-
-    /**
- * Determines whether the string appears to be JSON by checking if, after skipping leading whitespace, it starts with `{` or `[` .
- *
- * @return `true` if the string (ignoring leading whitespace) begins with `{` or `[`, `false` otherwise.
- */
-private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{") || it.startsWith("[") }
 
     /**
          * Adds the standard default HTTP headers used by the client to this request builder.
@@ -604,7 +579,6 @@ private fun String.looksLikeJson(): Boolean = trimStart().let { it.startsWith("{
          * @return The same [Request.Builder] with the default headers applied.
          */
         private fun Request.Builder.defaultHeaders(): Request.Builder = header("User-Agent", USER_AGENT)
- main
         .header("Accept", "application/json,text/plain,*/*")
         .header("Accept-Language", "en-US,en;q=0.9")
 
