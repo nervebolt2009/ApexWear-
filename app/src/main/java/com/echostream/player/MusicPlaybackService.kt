@@ -39,7 +39,6 @@ class MusicPlaybackService : MediaSessionService() {
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
 
         val httpClient = OkHttpClient.Builder()
@@ -53,7 +52,6 @@ class MusicPlaybackService : MediaSessionService() {
 
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
- main
         val okHttpClient = OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
@@ -134,14 +132,12 @@ class MusicPlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
- codex/github-mention-add-ui/navigation,-robust-invidious/youtube-k46br1
 
     /**
      * Provides the default HTTP headers applied to media playback requests.
      *
      * @return A map of header names to values containing `User-Agent`, `Accept`, and `Accept-Language`.
      */
- main
     private fun defaultPlaybackHeaders(): Map<String, String> = mapOf(
         "User-Agent" to USER_AGENT,
         "Accept" to "audio/webm,audio/mp4,video/webm,video/mp4,application/x-mpegurl,*/*",
