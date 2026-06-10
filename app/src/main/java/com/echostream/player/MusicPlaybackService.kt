@@ -150,6 +150,22 @@ class MusicPlaybackService : MediaSessionService() {
         ): ListenableFuture<List<MediaItem>> = Futures.immediateFuture(mediaItems)
 
         /**
+         * Handles setMediaItem(s) calls from the MediaController.
+         * Passes the already-resolved stream URIs through to ExoPlayer unchanged.
+         */
+        @OptIn(UnstableApi::class)
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: List<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> =
+            Futures.immediateFuture(
+                MediaSession.MediaItemsWithStartPosition(mediaItems, startIndex, startPositionMs)
+            )
+
+        /**
          * Provides the current media item and its resume position when playback is resumed.
          *
          * Returns a `MediaItemsWithStartPosition` that contains the current media item as the sole item,
