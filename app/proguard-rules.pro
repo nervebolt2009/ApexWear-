@@ -1,8 +1,9 @@
 # ── Your app packages ────────────────────────────────────────────────────────
--keep class com.echostream.data.**    { *; }
--keep class com.echostream.network.** { *; }
--keep class com.echostream.player.**  { *; }   # <── THIS WAS MISSING (MusicPlaybackService)
--keep class com.echostream.ui.**      { *; }   # keep any ViewModel / composable state holders
+-keep class com.echostream.data.**      { *; }
+-keep class com.echostream.network.**  { *; }
+-keep class com.echostream.player.**   { *; }
+-keep class com.echostream.ui.**       { *; }
+-keep class com.echostream.viewmodel.** { *; }
 
 # ── Android Service/Activity loaded by system via reflection ──────────────────
 -keep public class * extends android.app.Service
@@ -11,12 +12,6 @@
 
 # ── Media3 / ExoPlayer ───────────────────────────────────────────────────────
 -keep class androidx.media3.** { *; }
--keep class androidx.wear.compose.** { *; }
--keepattributes Signature, Exceptions, InnerClasses
--keep class org.schabi.newpipe.extractor.** { *; }
--dontwarn org.schabi.newpipe.extractor.**
--dontwarn okhttp3.**, okio.**, kotlinx.coroutines.**, androidx.media3.**, androidx.wear.**
-
 -keep class androidx.media3.exoplayer.audio.**      { *; }
 -keep class androidx.media3.exoplayer.source.**     { *; }
 -keep class androidx.media3.extractor.**            { *; }
