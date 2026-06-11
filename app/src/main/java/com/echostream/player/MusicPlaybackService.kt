@@ -130,7 +130,8 @@ class MusicPlaybackService : MediaSessionService() {
     private fun defaultPlaybackHeaders(): Map<String, String> = mapOf(
         "User-Agent" to USER_AGENT,
         "Accept" to "audio/webm,audio/mp4,video/webm,video/mp4,application/x-mpegurl,*/*",
-        "Accept-Language" to "en-US,en;q=0.9"
+        "Accept-Language" to "en-US,en;q=0.9",
+        "Referer" to "https://www.youtube.com/"
     )
 
     private inner class EchoStreamSessionCallback : MediaSession.Callback {
