@@ -42,11 +42,8 @@ jobs:
         with:
           gradle-version: 9.3.1
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Build minified debug APK
-        run: ./gradlew :app:assembleMinifiedDebug --stacktrace
+        run: gradle :app:assembleMinifiedDebug --stacktrace
 
       - name: Verify APK size is under 20 MB
         run: |
@@ -67,7 +64,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: gradle :app:assembleDebug --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

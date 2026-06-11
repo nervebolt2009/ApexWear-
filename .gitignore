@@ -6,4 +6,3 @@ local.properties
 .idea/
 .DS_Store
 *.keystore
-gradle/wrapper/gradle-wrapper.jar
