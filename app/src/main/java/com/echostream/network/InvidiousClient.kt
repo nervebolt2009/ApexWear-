@@ -20,25 +20,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class InvidiousClient {
     private val instances = listOf(
-        "https://invidious.privacydev.net",
-        "https://yewtu.be",
-        "https://inv.nadeko.net",
-        "https://invidious.tiekoetter.com",
-        "https://iv.datura.network",
-        "https://invidious.f5.si"
+        "https://inv.tux.pizza",
+        "https://invidious.private.coffee",
+        "https://invidious.projectsegfau.lt",
+        "https://yt.artemislena.eu",
+        "https://invidious.slipfox.xyz"
     )
 
     private val pipedInstances = listOf(
         "https://pipedapi.kavin.rocks",
-        "https://pipedapi-libre.kavin.rocks",
-        "https://api.piped.private.coffee",
-        "https://pipedapi.adminforge.de",
-        "https://piped-api.privacy.com.de",
-        "https://api.piped.yt",
+        "https://piped-api.noseka1.com",
         "https://pipedapi.drgns.space",
-        "https://pipedapi.owo.si",
-        "https://pipedapi.ducks.party",
-        "https://piped-api.codespace.cz"
+        "https://api.piped.yt"
     )
 
     private val client = OkHttpClient.Builder()
