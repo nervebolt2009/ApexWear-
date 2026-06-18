@@ -188,6 +188,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
      * @param result The search result whose audio should be played.
      */
     fun playTrack(result: SearchResult) {
+        _errorMessage.value = null
         _isBuffering.value = true
         _currentTrack.value = result.toTrack()
         updateCurrentTrackSavedState()
@@ -213,11 +214,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 controller.setMediaItem(result.toMediaItem(url))
                 controller.prepare()
                 controller.play()
-                _isPlaying.value = controller.isPlaying
             } catch (error: Exception) {
                 _errorMessage.value = error.message ?: "Playback failed. Try again."
                 _isBuffering.value = false
-            }
+
         }
     }
         

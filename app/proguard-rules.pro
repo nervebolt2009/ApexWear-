@@ -1,8 +1,9 @@
 # ── Your app packages ────────────────────────────────────────────────────────
--keep class com.echostream.data.**    { *; }
--keep class com.echostream.network.** { *; }
--keep class com.echostream.player.**  { *; }   # <── THIS WAS MISSING (MusicPlaybackService)
--keep class com.echostream.ui.**      { *; }   # keep any ViewModel / composable state holders
+-keep class com.echostream.data.**      { *; }
+-keep class com.echostream.network.**  { *; }
+-keep class com.echostream.player.**   { *; }
+-keep class com.echostream.ui.**       { *; }
+-keep class com.echostream.viewmodel.** { *; }
 
 # ── Android Service/Activity loaded by system via reflection ──────────────────
 -keep public class * extends android.app.Service
